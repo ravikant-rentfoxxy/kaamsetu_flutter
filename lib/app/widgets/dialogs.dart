@@ -44,7 +44,7 @@ class Dialogs {
     Get.closeAllSnackbars();
     Get.rawSnackbar(
       message: message,
-      backgroundColor: error ? AppColors.dangerDark : AppColors.textPrimary,
+      backgroundColor: error ? AppColors.dangerDark : AppColors.inverseSurface,
       margin: const EdgeInsets.all(AppSpacing.lg),
       borderRadius: AppRadius.md,
       duration: const Duration(seconds: 3),

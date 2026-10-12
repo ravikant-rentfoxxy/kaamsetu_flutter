@@ -25,35 +25,49 @@ class TabShell extends StatelessWidget {
     return Scaffold(
       body: IndexedStack(index: i, children: [for (final t in tabs) t.page]),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.border)),
-          boxShadow: AppShadows.lg,
-        ),
+        decoration: const BoxDecoration(color: AppColors.surface, border: Border(top: BorderSide(color: AppColors.border))),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 64,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
             child: Row(
               children: [
                 for (var t = 0; t < tabs.length; t++)
                   Expanded(
-                    child: InkWell(
-                      onTap: () => onTap(t),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(t == i ? tabs[t].activeIcon : tabs[t].icon, size: 24, color: t == i ? AppColors.primary : AppColors.textTertiary),
-                          const SizedBox(height: 3),
-                          Text(
-                            tabs[t].label,
-                            maxLines: 1,
-                            style: AppText.tiny.copyWith(
-                              color: t == i ? AppColors.primary : AppColors.textTertiary,
-                              fontWeight: t == i ? FontWeight.w700 : FontWeight.w500,
-                            ),
+                    child: Semantics(
+                      selected: t == i,
+                      button: true,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        onTap: () => onTap(t),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 56,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: t == i ? AppColors.primaryLight : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Icon(t == i ? tabs[t].activeIcon : tabs[t].icon, size: 22, color: t == i ? AppColors.primary : AppColors.textTertiary),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                tabs[t].label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.label.copyWith(
+                                  color: t == i ? AppColors.primary : AppColors.textTertiary,
+                                  fontWeight: t == i ? FontWeight.w800 : FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

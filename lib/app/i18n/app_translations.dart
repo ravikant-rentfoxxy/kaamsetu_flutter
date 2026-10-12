@@ -20,7 +20,7 @@ class AppTranslations extends Translations {
     'submit': ['जमा करें', 'Submit'],
     'skip': ['छोड़ें', 'Skip'],
     'back': ['वापस', 'Back'],
-    'logout': ['लॉगआउट', 'Logout'],
+    'logout': ['लॉग आउट', 'Log out'],
     'loading': ['लोड हो रहा है...', 'Loading...'],
     'error': ['कुछ गलत हुआ', 'Something went wrong'],
     'retry': ['फिर कोशिश करें', 'Try Again'],

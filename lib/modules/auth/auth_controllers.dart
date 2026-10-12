@@ -81,6 +81,7 @@ class OtpController extends GetxController {
   final error = ''.obs;
   final loading = false.obs;
   final seconds = 30.obs;
+  final resending = false.obs;
   final _repo = AuthRepository();
   Timer? _timer;
 
@@ -121,11 +122,19 @@ class OtpController extends GetxController {
   }
 
   Future<void> resend() async {
-    if (seconds.value > 0) return;
+    if (seconds.value > 0 || resending.value) return;
+    resending.value = true;
+    error.value = '';
     try {
       await _repo.sendOtp(mobile);
+      otp.clear();
       _startCountdown();
-    } catch (_) {}
+      Dialogs.toast(l('New code sent', 'नया कोड भेजा गया'));
+    } catch (e) {
+      error.value = e is ApiException ? e.message : l('Failed to send OTP', 'OTP भेजने में विफल');
+    } finally {
+      resending.value = false;
+    }
   }
 
   @override

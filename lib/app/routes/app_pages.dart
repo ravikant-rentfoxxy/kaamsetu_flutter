@@ -12,12 +12,15 @@ import '../../modules/employer/matched_profiles_view.dart';
 import '../../modules/employer/post_requirement_view.dart';
 import '../../modules/employer/worker_detail_view.dart';
 import '../../modules/shared/offer_letter_view.dart';
+import '../../modules/worker/activity_view.dart';
 import '../../modules/worker/blocked_view.dart';
+import '../../modules/worker/job_detail_view.dart';
 import '../../modules/worker/jobs_view.dart';
 import '../../modules/worker/kyc_view.dart';
 import '../../modules/worker/profile_forms.dart';
 import '../../modules/worker/profile_view.dart';
 import '../../modules/worker/quick_onboarding.dart';
+import '../../modules/worker/refer_view.dart';
 import '../../modules/worker/worker_home_view.dart';
 import '../../modules/worker/worker_shell.dart';
 import '../data/stores/employer_store.dart';
@@ -77,11 +80,14 @@ class AppPages {
     _worker(Routes.quickLocation, () => const QuickLocationView()),
     _worker(Routes.quickJobType, () => const QuickJobTypeView()),
     _worker(Routes.quickSalary, () => const QuickSalaryView()),
-    GetPage(name: Routes.quickSuccess, page: () => const QuickSuccessView()),
+    _worker(Routes.quickSuccess, () => const QuickSuccessView()),
     _worker(Routes.personalDetails, () => const PersonalDetailsView(), () => Get.lazyPut(() => PersonalDetailsController())),
     _worker(Routes.occupationSkills, () => const OccupationSkillsView(), () => Get.lazyPut(() => OccupationSkillsController())),
     _worker(Routes.workHistory, () => const WorkHistoryView(), () => Get.lazyPut(() => WorkHistoryController())),
     _worker(Routes.locationPrefs, () => const LocationPrefsView(), () => Get.lazyPut(() => LocationPrefsController())),
+    _worker(Routes.jobDetail, () => const JobDetailView(), () => Get.lazyPut(() => JobsController(), fenix: true)),
+    _worker(Routes.activity, () => const ActivityView()),
+    _worker(Routes.refer, () => const ReferView()),
     _worker(Routes.kyc, () => const KycView(), () => Get.lazyPut(() => KycController(), fenix: true)),
     _worker(Routes.blocked, () => const BlockedView(), () => Get.lazyPut(() => BlockedController())),
 

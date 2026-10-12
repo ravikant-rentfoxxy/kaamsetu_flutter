@@ -6,8 +6,10 @@ import '../theme/app_text.dart';
 import '../theme/job_meta.dart';
 import '../utils/format.dart';
 import 'app_button.dart';
+import 'kit.dart';
 
 export 'app_button.dart';
+export 'kit.dart';
 
 // ── AlertCard ────────────────────────────────────────────────────────────────
 
@@ -23,25 +25,25 @@ class AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (Color bg, Color border, Color tint, IconData icon) = switch (type) {
-      AlertType.danger => (AppColors.dangerLight, AppColors.danger, AppColors.dangerText, Icons.error),
-      AlertType.warning => (AppColors.warningLight, AppColors.warning, AppColors.warningText, Icons.warning_rounded),
-      AlertType.success => (AppColors.successLight, AppColors.success, AppColors.successText, Icons.check_circle),
-      AlertType.info => (AppColors.primaryLight, AppColors.primary, AppColors.primaryText, Icons.info),
+    final (Color bg, Color tint, IconData icon) = switch (type) {
+      AlertType.danger => (AppColors.dangerLight, AppColors.dangerText, Icons.error),
+      AlertType.warning => (AppColors.warningLight, AppColors.warningText, Icons.warning_rounded),
+      AlertType.success => (AppColors.successLight, AppColors.successText, Icons.verified_user),
+      AlertType.info => (AppColors.primaryLight, AppColors.primaryText, Icons.info),
     };
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Material(
         color: bg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md), side: BorderSide(color: border)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.md),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(icon, size: 22, color: tint),
+                Icon(icon, size: 20, color: tint),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
@@ -51,7 +53,7 @@ class AlertCard extends StatelessWidget {
                         Text(title!, style: AppText.captionStrong.copyWith(color: tint)),
                         const SizedBox(height: 2),
                       ],
-                      Text(message, style: AppText.caption.copyWith(color: tint.withValues(alpha: 0.9))),
+                      Text(message, style: AppText.caption.copyWith(color: tint)),
                     ],
                   ),
                 ),
@@ -70,14 +72,25 @@ class AlertCard extends StatelessWidget {
 /// KaamDhaam mark: a Trust-Blue rounded badge with a white briefcase and the
 /// amber "bridge" accent (work connecting people).
 class BrandLogo extends StatelessWidget {
-  const BrandLogo({super.key, this.size = 64, this.showWordmark = true, this.light = false});
+  const BrandLogo({super.key, this.size = 64, this.showWordmark = true, this.light = false, this.inline = false, this.tagline = true});
 
   final double size;
   final bool showWordmark;
   final bool light;
 
+  /// Small mark + wordmark side by side (top of the phone screen).
+  final bool inline;
+  final bool tagline;
+
   @override
   Widget build(BuildContext context) {
+    if (inline) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        BrandLogo(size: size, showWordmark: false, light: light),
+        const SizedBox(width: 10),
+        _wordmark(size * 0.5),
+      ]);
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -87,12 +100,12 @@ class BrandLogo extends StatelessWidget {
           decoration: BoxDecoration(
             color: light ? Colors.white.withValues(alpha: 0.16) : AppColors.primary,
             borderRadius: BorderRadius.circular(size * 0.28),
-            boxShadow: light ? null : AppShadows.primary,
+            boxShadow: light || size < 48 ? null : AppShadows.primary,
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Icon(Icons.work, size: size * 0.46, color: Colors.white),
+              Icon(Icons.work, size: size * 0.47, color: Colors.white),
               Positioned(
                 left: size * 0.22,
                 right: size * 0.22,
@@ -107,22 +120,26 @@ class BrandLogo extends StatelessWidget {
         ),
         if (showWordmark) ...[
           const SizedBox(height: 14),
-          Text.rich(
-            TextSpan(children: [
-              TextSpan(text: 'Kaam', style: TextStyle(color: light ? Colors.white : AppColors.primary)),
-              const TextSpan(text: 'Dhaam', style: TextStyle(color: AppColors.accent)),
-            ]),
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Verified work, real trust',
-            style: TextStyle(fontSize: 14, color: light ? Colors.white.withValues(alpha: 0.85) : AppColors.textSecondary),
-          ),
+          _wordmark(28),
+          if (tagline) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Verified work, real trust',
+              style: AppText.body.copyWith(fontSize: 14, color: light ? Colors.white.withValues(alpha: 0.85) : AppColors.textSecondary),
+            ),
+          ],
         ],
       ],
     );
   }
+
+  Widget _wordmark(double fontSize) => Text.rich(
+        TextSpan(children: [
+          TextSpan(text: 'Kaam', style: TextStyle(color: light ? Colors.white : AppColors.primary)),
+          const TextSpan(text: 'Dhaam', style: TextStyle(color: AppColors.accent)),
+        ]),
+        style: TextStyle(fontFamily: AppText.headingFont, fontSize: fontSize, fontWeight: FontWeight.w800, letterSpacing: -fontSize * 0.02, height: 1.2),
+      );
 }
 
 // ── JobIcon ──────────────────────────────────────────────────────────────────
@@ -140,8 +157,8 @@ class JobIcon extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(size * 0.28)),
-      child: Icon(meta.icon, size: size * 0.52, color: meta.color),
+      decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(size * 0.27)),
+      child: Icon(meta.icon, size: size * 0.54, color: meta.color),
     );
   }
 }
@@ -182,7 +199,7 @@ class AppAvatar extends StatelessWidget {
         ),
         child: Text(
           initials(name),
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: fontSize ?? size * 0.38),
+          style: TextStyle(fontFamily: AppText.headingFont, color: Colors.white, fontWeight: FontWeight.w800, fontSize: fontSize ?? size * 0.34),
         ),
       );
 }
@@ -255,17 +272,18 @@ class _AppInputState extends State<AppInput> {
         children: [
           if (widget.label != null) ...[
             Text(widget.label!, style: AppText.captionStrong),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
           ],
-          Container(
-            constraints: const BoxConstraints(minHeight: 52),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: EdgeInsets.symmetric(horizontal: focused || hasError ? 15.5 : AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
-                color: hasError ? AppColors.danger : (focused ? AppColors.primary : AppColors.border),
-                width: 1.5,
+                color: hasError ? AppColors.danger : (focused ? AppColors.primary : AppColors.borderStrong),
+                width: focused || hasError ? 2 : 1.5,
               ),
             ),
             child: Row(
@@ -274,9 +292,9 @@ class _AppInputState extends State<AppInput> {
                 if (widget.icon != null) ...[
                   Padding(
                     padding: EdgeInsets.only(top: widget.maxLines > 1 ? 14 : 0),
-                    child: Icon(widget.icon, size: 20, color: AppColors.textTertiary),
+                    child: Icon(widget.icon, size: 22, color: AppColors.textTertiary),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: 10),
                 ],
                 Expanded(
                   child: TextField(
@@ -292,14 +310,14 @@ class _AppInputState extends State<AppInput> {
                     onSubmitted: widget.onSubmitted,
                     textInputAction: widget.textInputAction,
                     inputFormatters: widget.inputFormatters,
-                    style: AppText.bodyLg,
+                    style: AppText.bodyLg.copyWith(fontSize: 17, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
                       counterText: '',
                       hintText: widget.hint,
-                      hintStyle: AppText.bodyLg.copyWith(color: AppColors.textTertiary),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      hintStyle: AppText.bodyLg.copyWith(fontSize: 17, color: AppColors.textTertiary),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 13),
                     ),
                   ),
                 ),
@@ -348,27 +366,34 @@ class SelectChip extends StatelessWidget {
   final IconData? icon;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: selected ? AppColors.primaryLight : AppColors.surface,
-        shape: StadiumBorder(side: BorderSide(color: selected ? AppColors.primary : AppColors.border, width: 1.5)),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 16, color: selected ? AppColors.primary : AppColors.textSecondary),
-                  const SizedBox(width: 6),
-                ],
-                Text(label, style: AppText.captionStrong.copyWith(color: selected ? AppColors.primaryText : AppColors.textSecondary)),
+  Widget build(BuildContext context) {
+    final leading = icon ?? (selected ? Icons.check : null);
+    final shape = StadiumBorder(side: BorderSide(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1));
+    return Material(
+      color: selected ? AppColors.primaryLight : AppColors.surface,
+      shape: shape,
+      child: InkWell(
+        customBorder: shape,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (leading != null) ...[
+                Icon(leading, size: 16, color: selected ? AppColors.primary : AppColors.textSecondary),
+                const SizedBox(width: 5),
               ],
-            ),
+              Text(
+                label,
+                style: AppText.captionStrong.copyWith(color: selected ? AppColors.primaryDark : AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class ChipGroup extends StatelessWidget {
@@ -390,19 +415,21 @@ class ChipGroup extends StatelessWidget {
 
 /// Filter pill that turns solid blue when active (used on feeds / toolbars).
 class FilterPill extends StatelessWidget {
-  const FilterPill({super.key, required this.label, required this.active, required this.onTap, this.icon, this.square = false});
+  const FilterPill({super.key, required this.label, required this.active, required this.onTap, this.icon, this.iconColor, this.square = false});
 
   final String label;
   final bool active;
   final VoidCallback onTap;
   final IconData? icon;
+
+  /// Tint for the leading icon while inactive (job-type colour on category pills).
+  final Color? iconColor;
   final bool square;
 
   @override
   Widget build(BuildContext context) {
-    final shape = square
-        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md), side: BorderSide(color: active ? AppColors.primary : AppColors.border, width: 1.5))
-        : StadiumBorder(side: BorderSide(color: active ? AppColors.primary : AppColors.border));
+    final side = active ? BorderSide.none : const BorderSide(color: AppColors.border);
+    final OutlinedBorder shape = square ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md), side: side) : StadiumBorder(side: side);
     return Material(
       color: active ? AppColors.primary : AppColors.surface,
       shape: shape,
@@ -410,16 +437,12 @@ class FilterPill extends StatelessWidget {
         customBorder: shape,
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: square ? 18 : 14, vertical: square ? 10 : 8),
+          padding: EdgeInsets.symmetric(horizontal: square ? 18 : (icon != null ? 12 : 14), vertical: square ? 10 : 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[Icon(icon, size: 14, color: active ? Colors.white : AppColors.textSecondary), const SizedBox(width: 5)],
-              Text(
-                label,
-                style: (square ? AppText.bodyStrong : AppText.caption.copyWith(fontWeight: FontWeight.w600))
-                    .copyWith(color: active ? Colors.white : AppColors.textSecondary),
-              ),
+              if (icon != null) ...[Icon(icon, size: 16, color: active ? Colors.white : (iconColor ?? AppColors.textSecondary)), const SizedBox(width: 6)],
+              Text(label, style: AppText.captionStrong.copyWith(color: active ? Colors.white : AppColors.textSecondary)),
             ],
           ),
         ),
@@ -430,46 +453,92 @@ class FilterPill extends StatelessWidget {
 
 // ── ScreenHeader ─────────────────────────────────────────────────────────────
 
-/// Clean, consistent top bar for sub-screens. White, hairline border.
+/// White sub-screen bar: back (or close) on the left, centred title with an
+/// optional grey subtitle ("Step 2 of 5"), optional trailing action, and an
+/// optional segmented progress bar underneath.
 class ScreenHeader extends StatelessWidget {
-  const ScreenHeader({super.key, required this.title, this.subtitle, this.onBack});
+  const ScreenHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.onBack,
+    this.close = false,
+    this.trailing,
+    this.step,
+    this.totalSteps,
+    this.stepColor = AppColors.accent,
+    this.bottom,
+    this.border = true,
+  });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
 
+  /// Show ✕ instead of ← (first step of a flow).
+  final bool close;
+  final Widget? trailing;
+
+  /// Segmented progress under the title when both are set.
+  final int? step;
+  final int? totalSteps;
+  final Color stepColor;
+
+  /// Extra content inside the white header (segmented control, search…).
+  final Widget? bottom;
+  final bool border;
+
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(color: AppColors.surface, border: Border(bottom: BorderSide(color: AppColors.border))),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: border ? const Border(bottom: BorderSide(color: AppColors.border)) : null,
+        ),
         child: SafeArea(
           bottom: false,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 56),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: onBack == null ? null : IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 56,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: onBack == null
+                            ? null
+                            : IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: onBack,
+                                tooltip: close ? 'Close' : 'Back',
+                                icon: Icon(close ? Icons.close_rounded : Icons.arrow_back_rounded, size: 22, color: AppColors.textPrimary),
+                              ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(title, style: AppText.h3, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                            if (subtitle != null)
+                              Text(subtitle!, style: AppText.tiny, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 40, height: 40, child: trailing),
+                    ],
                   ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(title, style: AppText.h3, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        if (subtitle != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 1),
-                            child: Text(subtitle!, style: AppText.caption.copyWith(color: AppColors.textTertiary), maxLines: 1),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
+                ),
               ),
-            ),
+              if (step != null && totalSteps != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.md),
+                  child: SegmentedProgress(current: step!, total: totalSteps!, color: stepColor),
+                ),
+              ?bottom,
+            ],
           ),
         ),
       );
@@ -477,8 +546,9 @@ class ScreenHeader extends StatelessWidget {
 
 // ── ProgressBar ──────────────────────────────────────────────────────────────
 
+/// Thin continuous bar (profile completion). For flows use [SegmentedProgress].
 class StepProgress extends StatelessWidget {
-  const StepProgress({super.key, required this.current, required this.total, this.color = AppColors.accent, this.track = AppColors.border, this.height = 8});
+  const StepProgress({super.key, required this.current, required this.total, this.color = AppColors.primary, this.track = AppColors.border, this.height = 6});
 
   final int current;
   final int total;
@@ -487,16 +557,13 @@ class StepProgress extends StatelessWidget {
   final double height;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(height / 2),
-          child: LinearProgressIndicator(
-            value: total > 0 ? (current / total).clamp(0, 1).toDouble() : 0,
-            minHeight: height,
-            color: color,
-            backgroundColor: track,
-          ),
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(height / 2),
+        child: LinearProgressIndicator(
+          value: total > 0 ? (current / total).clamp(0, 1).toDouble() : 0,
+          minHeight: height,
+          color: color,
+          backgroundColor: track,
         ),
       );
 }
@@ -520,14 +587,14 @@ class EmptyState extends StatelessWidget {
             Container(
               width: 76,
               height: 76,
-              decoration: const BoxDecoration(color: AppColors.surfaceAlt, shape: BoxShape.circle),
-              child: Icon(icon, size: 36, color: AppColors.textTertiary),
+              decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: Icon(icon, size: 36, color: AppColors.primary),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(message, style: AppText.h3, textAlign: TextAlign.center),
             if (subMessage != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Text(subMessage!, style: AppText.body.copyWith(color: AppColors.textTertiary), textAlign: TextAlign.center),
+              Text(subMessage!, style: AppText.body, textAlign: TextAlign.center),
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.xl),
@@ -540,13 +607,14 @@ class EmptyState extends StatelessWidget {
 
 // ── StatusBadge ──────────────────────────────────────────────────────────────
 
-enum BadgeStatus { verified, active, pending, inProgress, blocked, flagged, rejected }
+enum BadgeStatus { verified, active, pending, inProgress, shortlisted, blocked, flagged, rejected, neutral }
 
 class StatusBadge extends StatelessWidget {
-  const StatusBadge({super.key, required this.status, this.label});
+  const StatusBadge({super.key, required this.status, this.label, this.dot = true});
 
   final BadgeStatus status;
   final String? label;
+  final bool dot;
 
   @override
   Widget build(BuildContext context) {
@@ -554,20 +622,24 @@ class StatusBadge extends StatelessWidget {
       BadgeStatus.verified => (AppColors.successLight, AppColors.successText, AppColors.success, 'Verified'),
       BadgeStatus.active => (AppColors.successLight, AppColors.successText, AppColors.success, 'Active'),
       BadgeStatus.pending => (AppColors.warningLight, AppColors.warningText, AppColors.warning, 'Pending'),
-      BadgeStatus.inProgress => (AppColors.primaryLight, AppColors.primaryText, AppColors.primary, 'In Progress'),
+      BadgeStatus.inProgress => (AppColors.primaryLight, AppColors.primaryText, AppColors.primary, 'In progress'),
+      BadgeStatus.shortlisted => (AppColors.accentLight, AppColors.accentText, AppColors.accent, 'Shortlisted'),
+      BadgeStatus.neutral => (AppColors.surfaceContainer, AppColors.textSecondary, AppColors.textTertiary, ''),
       BadgeStatus.blocked => (AppColors.dangerLight, AppColors.dangerText, AppColors.danger, 'Blocked'),
       BadgeStatus.flagged => (AppColors.dangerLight, AppColors.dangerText, AppColors.danger, 'Flagged'),
       BadgeStatus.rejected => (AppColors.dangerLight, AppColors.dangerText, AppColors.danger, 'Rejected'),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(label ?? def, style: AppText.tiny.copyWith(fontWeight: FontWeight.w700, color: text)),
+          if (this.dot) ...[
+            Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+          ],
+          Text(label ?? def, style: AppText.label.copyWith(color: text)),
         ],
       ),
     );
@@ -577,8 +649,9 @@ class StatusBadge extends StatelessWidget {
 // ── Small building blocks ────────────────────────────────────────────────────
 
 /// White card with hairline border + soft shadow (the app's base surface).
+/// White card, 16px radius, hairline border — the app's base surface.
 class SurfaceCard extends StatelessWidget {
-  const SurfaceCard({super.key, required this.child, this.padding = const EdgeInsets.all(AppSpacing.lg), this.onTap, this.borderColor, this.borderWidth = 1, this.margin = const EdgeInsets.only(bottom: AppSpacing.md), this.color = AppColors.surface});
+  const SurfaceCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.onTap, this.borderColor, this.borderWidth = 1, this.margin = const EdgeInsets.only(bottom: 10), this.color = AppColors.surface, this.radius = AppRadius.lg});
 
   final Widget child;
   final EdgeInsets padding;
@@ -587,26 +660,26 @@ class SurfaceCard extends StatelessWidget {
   final double borderWidth;
   final EdgeInsets margin;
   final Color color;
+  final double radius;
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: margin,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.sm),
+  Widget build(BuildContext context) => Padding(
+        padding: margin,
         child: Material(
           color: color,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(radius),
             side: BorderSide(color: borderColor ?? AppColors.border, width: borderWidth),
           ),
-          child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+          child: onTap == null ? Padding(padding: padding, child: child) : InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
         ),
       );
 }
 
 /// Small rounded tag: icon + text.
 class TagPill extends StatelessWidget {
-  const TagPill({super.key, required this.text, this.icon, this.bg = AppColors.surfaceAlt, this.fg = AppColors.textSecondary, this.bold = false, this.small = false});
+  const TagPill({super.key, required this.text, this.icon, this.bg = AppColors.surfaceContainer, this.fg = AppColors.textSecondary, this.bold = false, this.small = false, this.filledIcon = false});
 
   final String text;
   final IconData? icon;
@@ -614,20 +687,21 @@ class TagPill extends StatelessWidget {
   final Color fg;
   final bool bold;
   final bool small;
+  final bool filledIcon;
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.symmetric(horizontal: small ? 8 : 10, vertical: small ? 4 : 5),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: small ? 3 : 4),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[Icon(icon, size: small ? 12 : 13, color: fg), const SizedBox(width: 4)],
+            if (icon != null) ...[Icon(icon, size: 14, color: fg), const SizedBox(width: 4)],
             Flexible(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                style: (small ? AppText.tiny : AppText.caption).copyWith(color: fg, fontWeight: bold ? FontWeight.w700 : (small ? FontWeight.w600 : FontWeight.w500)),
+                style: AppText.tiny.copyWith(color: fg, fontWeight: bold ? FontWeight.w700 : FontWeight.w600),
               ),
             ),
           ],
@@ -654,24 +728,28 @@ class IconCircle extends StatelessWidget {
       );
 }
 
+/// "Label ........ Value" row with a hairline divider (summaries, letters).
 class DetailRow extends StatelessWidget {
-  const DetailRow({super.key, required this.icon, required this.label, required this.value});
+  const DetailRow({super.key, this.icon, required this.label, required this.value, this.valueColor, this.last = false, this.fontSize = 14});
 
-  final IconData icon;
+  /// Accepted for older call sites; the redesign shows no icons in these rows.
+  final IconData? icon;
   final String label;
   final String value;
+  final Color? valueColor;
+  final bool last;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
+        decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: AppColors.border))),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: AppColors.textTertiary),
-            const SizedBox(width: 8),
-            Text(label, style: AppText.body),
+            Text(label, style: AppText.body.copyWith(fontSize: fontSize)),
             const SizedBox(width: 12),
-            Expanded(child: Text(value, textAlign: TextAlign.right, style: AppText.bodyStrong)),
+            Expanded(child: Text(value, textAlign: TextAlign.right, style: AppText.bodyStrong.copyWith(fontSize: fontSize, color: valueColor))),
           ],
         ),
       );
@@ -686,15 +764,16 @@ class SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(minHeight: 48),
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.background,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, size: 18, color: AppColors.textTertiary),
+            const Icon(Icons.search_rounded, size: 20, color: AppColors.textTertiary),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -707,7 +786,7 @@ class SearchField extends StatelessWidget {
                   border: InputBorder.none,
                   hintText: hint,
                   hintStyle: AppText.body.copyWith(color: AppColors.textTertiary),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
                 ),
               ),
             ),
@@ -728,9 +807,9 @@ class SearchField extends StatelessWidget {
       );
 }
 
-/// Labeled toggle row inside a bordered card.
+/// Icon + label (+ grey sub) + switch inside a bordered white row.
 class ToggleCard extends StatelessWidget {
-  const ToggleCard({super.key, required this.icon, required this.label, this.sub, required this.value, required this.onChanged, this.activeColor = AppColors.primary});
+  const ToggleCard({super.key, required this.icon, required this.label, this.sub, required this.value, required this.onChanged, this.activeColor = AppColors.success, this.iconColor = AppColors.textSecondary, this.filledIcon = false, this.margin = const EdgeInsets.only(bottom: 10)});
 
   final IconData icon;
   final String label;
@@ -738,46 +817,57 @@ class ToggleCard extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   final Color activeColor;
+  final Color iconColor;
+  final bool filledIcon;
+  final EdgeInsets margin;
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.lg),
-        decoration: BoxDecoration(
+  Widget build(BuildContext context) => Padding(
+        padding: margin,
+        child: Material(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: AppColors.textSecondary),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md), side: const BorderSide(color: AppColors.border)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            onTap: () => onChanged(!value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              child: Row(
                 children: [
-                  Text(label, style: AppText.bodyStrong),
-                  if (sub != null) Text(sub!, style: AppText.caption),
+                  Icon(icon, size: 22, color: iconColor),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, style: AppText.bodyStrong),
+                        if (sub != null) Text(sub!, style: AppText.tiny.copyWith(fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  AppSwitch(value: value, onChanged: onChanged, activeColor: activeColor),
                 ],
               ),
             ),
-            Switch.adaptive(value: value, onChanged: onChanged, activeTrackColor: activeColor),
-          ],
+          ),
         ),
       );
 }
 
 /// Bottom-sticky action area used on onboarding screens.
 class FooterBar extends StatelessWidget {
-  const FooterBar({super.key, required this.children});
+  const FooterBar({super.key, required this.children, this.border = true});
 
   final List<Widget> children;
 
+  /// Off on white "moment" screens (success, language) that have no card edge.
+  final bool border;
+
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(color: AppColors.surface, border: Border(top: BorderSide(color: AppColors.border))),
-        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.md),
-        child: SafeArea(top: false, child: Column(mainAxisSize: MainAxisSize.min, children: children)),
+        decoration: BoxDecoration(color: AppColors.surface, border: border ? const Border(top: BorderSide(color: AppColors.border)) : null),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, 14),
+        child: SafeArea(top: false, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: children)),
       );
 }
 
@@ -797,7 +887,7 @@ class LinkButton extends StatelessWidget {
           child: Text(
             text,
             textAlign: TextAlign.center,
-            style: AppText.body.copyWith(color: color, decoration: underline ? TextDecoration.underline : null, decorationColor: color),
+            style: AppText.bodyStrong.copyWith(fontSize: 14, color: color, decoration: underline ? TextDecoration.underline : null, decorationColor: color),
           ),
         ),
       );
@@ -821,15 +911,15 @@ class FeedSkeleton extends StatelessWidget {
             SurfaceCard(
               child: Row(
                 children: [
-                  Container(width: 52, height: 52, decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(14))),
+                  Container(width: 52, height: 52, decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: BorderRadius.circular(14))),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(height: 14, width: 140, color: AppColors.surfaceAlt),
+                        Container(height: 14, width: 140, color: AppColors.surfaceContainer),
                         const SizedBox(height: 8),
-                        Container(height: 11, width: 90, color: AppColors.surfaceAlt),
+                        Container(height: 11, width: 90, color: AppColors.surfaceContainer),
                       ],
                     ),
                   ),

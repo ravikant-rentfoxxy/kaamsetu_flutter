@@ -12,9 +12,11 @@ import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text.dart';
 import '../../app/theme/job_meta.dart';
 import '../../app/utils/pincode.dart';
+import '../../app/utils/format.dart';
 import '../../app/widgets/common.dart';
 import '../../app/widgets/dialogs.dart';
 import 'onboarding_widgets.dart';
+import 'worker_shell.dart';
 
 /// State for the 5-step quick profile (name → job → location → job type → salary).
 /// One controller spans all steps so answers survive back-navigation.
@@ -33,6 +35,11 @@ class QuickOnboardingController extends GetxController {
   final error = ''.obs;
   final loading = false.obs;
   final lookingUp = false.obs;
+
+  /// Post-office areas from the last pincode lookup, shown while the city
+  /// field still holds the looked-up city.
+  final areas = <String>[].obs;
+  final resolvedCity = ''.obs;
 
   String get _saveFailed => l('Could not save. Try again.', 'सेव नहीं हुआ। फिर कोशिश करें।');
 
@@ -58,6 +65,8 @@ class QuickOnboardingController extends GetxController {
     final info = await lookupPincode(pin);
     lookingUp.value = false;
     if (info != null) {
+      resolvedCity.value = info.city;
+      areas.assignAll(info.areas);
       city.text = info.city;
       state.value = info.state;
     }
@@ -132,6 +141,16 @@ class QuickOnboardingController extends GetxController {
 
 String get _createProfile => l('Create profile', 'प्रोफ़ाइल बनाएँ');
 String _stepLabel(int n) => l('Step $n of 5', 'स्टेप $n / 5');
+String get _skip => l('Skip for now', 'अभी छोड़ें');
+
+Widget _next(QuickOnboardingController c, {VoidCallback? onPressed, bool disabled = false}) => AppButton(
+      title: 'next'.tr,
+      icon: Icons.arrow_forward_rounded,
+      trailingIcon: true,
+      loading: c.loading.value,
+      disabled: disabled,
+      onPressed: onPressed,
+    );
 
 class QuickNameView extends GetView<QuickOnboardingController> {
   const QuickNameView({super.key});
@@ -142,18 +161,21 @@ class QuickNameView extends GetView<QuickOnboardingController> {
         subtitle: _stepLabel(1),
         step: 1,
         total: 5,
+        close: true,
         onBack: controller.exit,
         question: l("What's your name?", 'आपका नाम क्या है?'),
         sub: l('This is how employers will see you.', 'नियोक्ता आपको इसी नाम से देखेंगे।'),
         error: controller.error,
-        footer: [Obx(() => AppButton(title: 'next'.tr, icon: Icons.arrow_forward, loading: controller.loading.value, onPressed: controller.saveName))],
+        footer: [Obx(() => _next(controller, onPressed: controller.saveName))],
         children: [
           AppInput(
             controller: controller.name,
             hint: l('e.g. Ramesh Kumar', 'जैसे रमेश कुमार'),
-            icon: Icons.person_outline,
+            icon: Icons.person_rounded,
             autofocus: true,
             textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            helper: l('Use the name on your Aadhaar card.', 'आधार कार्ड पर लिखा नाम ही डालें।'),
             onSubmitted: (_) => controller.saveName(),
           ),
         ],
@@ -169,15 +191,10 @@ class QuickJobView extends GetView<QuickOnboardingController> {
         subtitle: _stepLabel(2),
         step: 2,
         total: 5,
-        question: l('What work are you looking for?', 'आप कौन सा काम करते हैं?'),
-        sub: l('Pick your main job.', 'अपना मुख्य काम चुनें।'),
+        question: l('What work do you do?', 'आप कौन सा काम करते हैं?'),
+        sub: l('Pick your main job. You can add more later.', 'अपना मुख्य काम चुनें। बाकी बाद में जोड़ सकते हैं।'),
         footer: [
-          Obx(() => AppButton(
-                title: 'next'.tr,
-                icon: Icons.arrow_forward,
-                disabled: controller.jobType.value.isEmpty,
-                onPressed: () => Get.toNamed(Routes.quickLocation),
-              )),
+          Obx(() => _next(controller, disabled: controller.jobType.value.isEmpty, onPressed: () => Get.toNamed(Routes.quickLocation))),
         ],
         children: [
           Obx(() => JobTypeGrid(selected: {controller.jobType.value}, onTap: (t) => controller.jobType.value = t)),
@@ -194,56 +211,74 @@ class QuickLocationView extends GetView<QuickOnboardingController> {
         subtitle: _stepLabel(3),
         step: 3,
         total: 5,
-        question: l('Where are you?', 'आप कहाँ रहते हैं?'),
-        sub: l('We use this to show nearby jobs. Enter your pincode to auto-fill the city.', 'इससे हम पास की नौकरियाँ दिखाते हैं। पिनकोड डालें, शहर अपने आप भर जाएगा।'),
+        question: l('Where do you live?', 'आप कहाँ रहते हैं?'),
+        sub: l('We show jobs close to home first.', 'हम पहले घर के पास की नौकरियाँ दिखाते हैं।'),
         error: controller.error,
         footer: [
-          Obx(() => AppButton(
-                title: 'next'.tr,
-                icon: Icons.arrow_forward,
-                loading: controller.loading.value,
-                disabled: controller.cityText.value.trim().isEmpty,
-                onPressed: controller.saveLocation,
-              )),
+          Obx(() => _next(controller, disabled: controller.cityText.value.trim().isEmpty, onPressed: controller.saveLocation)),
         ],
         children: [
           AppInput(
-            label: 'pincode'.tr,
             controller: controller.pincode,
-            hint: '110001',
+            hint: l('Pincode, e.g. 110001', 'पिनकोड, जैसे 110001'),
             keyboardType: TextInputType.number,
             maxLength: 6,
-            icon: Icons.markunread_mailbox_outlined,
+            icon: Icons.pin_drop_rounded,
             inputFormatters: [digitsOnly],
             onChanged: controller.onPincode,
           ),
-          AppInput(label: 'city'.tr, controller: controller.city, hint: l('e.g. Delhi', 'जैसे दिल्ली'), icon: Icons.business_outlined),
+          AppInput(label: 'city'.tr, controller: controller.city, hint: l('e.g. Delhi', 'जैसे दिल्ली'), icon: Icons.location_city_rounded),
           Obx(() {
-            if (controller.lookingUp.value) return const LinearProgressIndicator(color: AppColors.primary);
-            final c = controller.cityText.value;
+            if (controller.lookingUp.value) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: const LinearProgressIndicator(color: AppColors.success, backgroundColor: AppColors.successLight),
+              );
+            }
+            final c = controller.cityText.value.trim();
             if (c.isEmpty) return const SizedBox.shrink();
-            return Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.successLight,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: const Color(0xFFB8E6D5)),
-              ),
-              child: Row(children: [
-                const IconCircle(icon: Icons.location_on, color: AppColors.success, bg: Color(0xFFD6F0E5), size: 44, iconSize: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '$c${controller.state.value.isNotEmpty ? ', ${controller.state.value}' : ''}',
-                    style: AppText.h3.copyWith(color: AppColors.successText),
-                  ),
-                ),
-              ]),
-            );
+            final st = controller.state.value;
+            final areas = c == controller.resolvedCity.value ? controller.areas.take(3).join(' · ') : '';
+            return _LocationFound(place: st.isNotEmpty ? '$c, $st' : c, areas: areas);
           }),
         ],
       );
 }
+
+/// Green confirmation card for the resolved location.
+class _LocationFound extends StatelessWidget {
+  const _LocationFound({required this.place, required this.areas});
+  final String place;
+  final String areas;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.successLight,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.successBorder),
+        ),
+        child: Row(children: [
+          const IconCircle(icon: Icons.location_on_rounded, color: AppColors.success, bg: AppColors.successCircle, size: 44, iconSize: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(place, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.h3.copyWith(color: AppColors.successText)),
+              if (areas.isNotEmpty)
+                Text(areas, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption.copyWith(color: AppColors.successText.withValues(alpha: 0.85))),
+            ]),
+          ),
+        ]),
+      );
+}
+
+const _workTypeMeta = <String, (IconData, String, String)>{
+  'FULL_TIME': (Icons.schedule_rounded, 'Fixed hours, every day', 'तय घंटे, रोज़ काम'),
+  'PART_TIME': (Icons.hourglass_top_rounded, 'A few hours a day', 'दिन में कुछ घंटे'),
+  'LIVE_IN': (Icons.night_shelter_rounded, 'Stay at the workplace', 'काम की जगह पर रहना'),
+  'TEMPORARY': (Icons.event_rounded, 'Short jobs and events', 'छोटे काम और इवेंट'),
+};
 
 class QuickJobTypeView extends GetView<QuickOnboardingController> {
   const QuickJobTypeView({super.key});
@@ -257,14 +292,9 @@ class QuickJobTypeView extends GetView<QuickOnboardingController> {
         question: l('How do you want to work?', 'आप किस तरह काम करना चाहते हैं?'),
         sub: l('Choose one.', 'एक चुनें।'),
         footer: [
-          Obx(() => AppButton(
-                title: 'next'.tr,
-                icon: Icons.arrow_forward,
-                disabled: controller.employmentType.value.isEmpty,
-                onPressed: () => Get.toNamed(Routes.quickSalary),
-              )),
+          Obx(() => _next(controller, disabled: controller.employmentType.value.isEmpty, onPressed: () => Get.toNamed(Routes.quickSalary))),
           LinkButton(
-            text: l('Skip for now', 'अभी छोड़ें'),
+            text: _skip,
             onTap: () {
               controller.employmentType.value = '';
               Get.toNamed(Routes.quickSalary);
@@ -272,13 +302,24 @@ class QuickJobTypeView extends GetView<QuickOnboardingController> {
           ),
         ],
         children: [
-          Obx(() => ChipGroup(
-                options: [for (final e in employmentTypes) ChipOption(e.value, e.label(lang))],
-                selected: [controller.employmentType.value],
-                onToggle: (v) => controller.employmentType.value = v,
-              )),
+          Obx(() => Column(children: [
+                for (final e in employmentTypes)
+                  OptionRow(
+                    label: e.label(lang),
+                    sub: _workTypeMeta[e.value] == null ? null : l(_workTypeMeta[e.value]!.$2, _workTypeMeta[e.value]!.$3),
+                    icon: _workTypeMeta[e.value]?.$1 ?? Icons.work_outline_rounded,
+                    selected: controller.employmentType.value == e.value,
+                    onTap: () => controller.employmentType.value = e.value,
+                  ),
+              ])),
         ],
       );
+}
+
+/// "₹16,000 – 20,000" / "₹25,000 or more" — full rupees, no "k".
+String _bandLabel(SalaryBand b) {
+  if (b.max == null) return l('${formatInr(b.min)} or more', '${formatInr(b.min)} या ज़्यादा');
+  return '${formatInr(b.min)} – ${formatInr(b.max).substring(1)}';
 }
 
 class QuickSalaryView extends GetView<QuickOnboardingController> {
@@ -296,69 +337,97 @@ class QuickSalaryView extends GetView<QuickOnboardingController> {
         footer: [
           Obx(() => AppButton(
                 title: l('Finish', 'पूरा करें'),
-                icon: Icons.check,
+                icon: Icons.check_rounded,
                 loading: controller.loading.value,
                 disabled: controller.salaryBand.value == null,
                 onPressed: () => controller.finish(withSalary: true),
               )),
-          LinkButton(text: l('Skip for now', 'अभी छोड़ें'), onTap: () => controller.finish(withSalary: false)),
+          Obx(() => LinkButton(text: _skip, onTap: controller.loading.value ? null : () => controller.finish(withSalary: false))),
         ],
         children: [
-          Obx(() => ChipGroup(
-                options: [for (var i = 0; i < salaryBands.length; i++) ChipOption('$i', salaryBands[i].label(lang))],
-                selected: ['${controller.salaryBand.value}'],
-                onToggle: (v) => controller.salaryBand.value = int.parse(v),
-              )),
+          Obx(() => Column(children: [
+                for (var i = 0; i < salaryBands.length; i++)
+                  OptionRow(
+                    label: _bandLabel(salaryBands[i]),
+                    sub: l('per month', 'प्रति माह'),
+                    subMuted: true,
+                    labelSize: 17,
+                    selected: controller.salaryBand.value == i,
+                    onTap: () => controller.salaryBand.value = i,
+                  ),
+              ])),
         ],
       );
 }
 
-class QuickSuccessView extends StatelessWidget {
+class QuickSuccessView extends StatefulWidget {
   const QuickSuccessView({super.key});
 
   @override
+  State<QuickSuccessView> createState() => _QuickSuccessViewState();
+}
+
+class _QuickSuccessViewState extends State<QuickSuccessView> {
+  @override
+  void initState() {
+    super.initState();
+    WorkerStore.to.refreshProfile();
+  }
+
+  String _message() {
+    final w = WorkerStore.to.profile.value;
+    final first = (w?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
+    final city = (w?.location?.city ?? '').trim();
+    if (city.isNotEmpty && first.isNotEmpty) return l('Employers in $city can now find you, $first.', '$city के नियोक्ता अब आपको ढूँढ सकते हैं, $first।');
+    if (city.isNotEmpty) return l('Employers in $city can now find you.', '$city के नियोक्ता अब आपको ढूँढ सकते हैं।');
+    if (first.isNotEmpty) return l('Employers can now find you, $first.', 'नियोक्ता अब आपको ढूँढ सकते हैं, $first।');
+    return l('Employers can now find you.', 'नियोक्ता अब आपको ढूँढ सकते हैं।');
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-        body: SafeArea(
-          child: Column(children: [
-            Expanded(
-              child: Stack(children: [
-                const Positioned(top: 40, left: 50, child: Icon(Icons.work, size: 26, color: AppColors.primaryLight)),
-                const Positioned(top: 90, right: 56, child: Icon(Icons.star, size: 22, color: AppColors.accentLight)),
-                const Positioned(top: 160, left: 40, child: Icon(Icons.location_on, size: 24, color: AppColors.successLight)),
-                Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Column(children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: const BoxDecoration(
-                          color: AppColors.success,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Color(0x661D9E75), blurRadius: 16, offset: Offset(0, 8))],
+        backgroundColor: AppColors.surface,
+        body: Column(children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: LayoutBuilder(
+                builder: (context, box) => SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: AppSpacing.xl),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: box.maxHeight - AppSpacing.xl * 2),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Obx(() => SuccessHero(title: l('Profile created!', 'प्रोफ़ाइल बन गई!'), body: _message())),
+                      const SizedBox(height: 28),
+                      TaskCard(
+                        icon: Icons.shield_rounded,
+                        title: l('Next: verify your identity', 'अगला: अपनी पहचान सत्यापित करें'),
+                        body: l(
+                          'Needed before you can apply. Five quick steps, about five minutes.',
+                          'आवेदन से पहले ज़रूरी है। पाँच आसान स्टेप, लगभग पाँच मिनट।',
                         ),
-                        child: const Icon(Icons.check, size: 56, color: Colors.white),
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Text('🎉 ${l('Profile created!', 'प्रोफ़ाइल बन गई!')}', style: AppText.h1.copyWith(color: AppColors.accent), textAlign: TextAlign.center),
-                      const SizedBox(height: 8),
-                      Text(
-                        l("You're all set to start getting job calls.", 'अब आपको नौकरी की कॉल आना शुरू हो जाएँगी।'),
-                        style: AppText.body,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      AlertCard(message: l('Complete your profile and verification to get more calls from employers.', 'प्रोफ़ाइल और जाँच पूरी करो, ज़्यादा कॉल आएँगी।')),
                     ]),
                   ),
                 ),
-              ]),
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: AppButton(title: l('Proceed', 'आगे बढ़ें'), icon: Icons.arrow_forward, onPressed: () => Get.offAllNamed(Routes.worker)),
+          ),
+          FooterBar(border: false, children: [
+            AppButton(
+              title: l('Start verification', 'सत्यापन शुरू करें'),
+              icon: Icons.arrow_forward_rounded,
+              trailingIcon: true,
+              onPressed: () => Get.offAllNamed(Routes.worker, arguments: WorkerShellController.openKyc),
+            ),
+            const SizedBox(height: 10),
+            AppButton(
+              title: l("I'll do it later", 'बाद में करूँगा'),
+              variant: ButtonVariant.ghost,
+              size: ButtonSize.md,
+              onPressed: () => Get.offAllNamed(Routes.worker),
             ),
           ]),
-        ),
+        ]),
       );
 }

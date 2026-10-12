@@ -7,7 +7,8 @@ import '../../app/theme/app_text.dart';
 import '../../app/theme/job_meta.dart';
 import '../../app/widgets/common.dart';
 
-/// Header + progress + big question + scrolling body + sticky footer.
+/// One-question step: white header (title, "Step N of M", amber segments),
+/// big question on the canvas, scrolling body and a pinned white footer.
 class OnboardingScaffold extends StatelessWidget {
   const OnboardingScaffold({
     super.key,
@@ -21,6 +22,7 @@ class OnboardingScaffold extends StatelessWidget {
     required this.children,
     this.footer,
     this.onBack,
+    this.close = false,
   });
 
   final String title;
@@ -34,23 +36,29 @@ class OnboardingScaffold extends StatelessWidget {
   final List<Widget>? footer;
   final VoidCallback? onBack;
 
+  /// ✕ instead of ← (first step of a flow).
+  final bool close;
+
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.background,
         body: Column(children: [
-          ScreenHeader(title: title, subtitle: subtitle, onBack: onBack ?? Get.back),
+          ScreenHeader(title: title, subtitle: subtitle, onBack: onBack ?? Get.back, close: close, step: step, totalSteps: total),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.lg, AppSpacing.xl, AppSpacing.xxxl),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 24, AppSpacing.xl, AppSpacing.xl),
               children: [
-                StepProgress(current: step, total: total),
                 if (question != null) ...[
+                  QuestionHeader(question!, subtitle: sub),
+                  const SizedBox(height: 20),
+                ] else if (sub != null) ...[
+                  Text(sub!, style: AppText.body),
                   const SizedBox(height: AppSpacing.lg),
-                  Text(question!, style: AppText.h1),
-                  const SizedBox(height: 6),
                 ],
-                if (sub != null) ...[Text(sub!, style: AppText.body), const SizedBox(height: AppSpacing.lg)],
                 if (error != null)
-                  Obx(() => error!.value.isEmpty ? const SizedBox.shrink() : AlertCard(type: AlertType.danger, message: error!.value)),
+                  Obx(() => error!.value.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(padding: const EdgeInsets.only(bottom: 12), child: AlertCard(type: AlertType.danger, message: error!.value))),
                 ...children,
               ],
             ),
@@ -60,9 +68,10 @@ class OnboardingScaffold extends StatelessWidget {
       );
 }
 
-/// 3-column grid of job-type tiles (icon + label), single or multi select.
+/// Grid of job-type tiles (icon + colour from job_meta.dart), single or multi
+/// select. All ten types fit without scrolling at 3 columns.
 class JobTypeGrid extends StatelessWidget {
-  const JobTypeGrid({super.key, required this.selected, required this.onTap, this.columns = 3, this.iconSize = 40, this.english = false});
+  const JobTypeGrid({super.key, required this.selected, required this.onTap, this.columns = 3, this.iconSize = 44, this.english = false});
 
   final Set<String> selected;
   final ValueChanged<String> onTap;
@@ -71,48 +80,24 @@ class JobTypeGrid extends StatelessWidget {
   final bool english;
 
   @override
-  Widget build(BuildContext context) => GridView.count(
-        crossAxisCount: columns,
+  Widget build(BuildContext context) => GridView(
         shrinkWrap: true,
+        padding: EdgeInsets.zero,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 8,
-        childAspectRatio: columns == 3 ? 1.05 : 0.9,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: columns == 3 ? 10 : 8,
+          mainAxisExtent: iconSize + 60,
+        ),
         children: [
           for (final t in jobTypes)
-            Material(
-              color: selected.contains(t) ? AppColors.primaryLight : AppColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                side: BorderSide(color: selected.contains(t) ? AppColors.primary : AppColors.border, width: 1.5),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                onTap: () => onTap(t),
-                child: Stack(children: [
-                  Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      JobIcon(jobType: t, size: iconSize),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Text(
-                          english ? getJobMeta(t).labelEn : getJobMeta(t).label(lang),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.tiny.copyWith(
-                            fontSize: columns == 3 ? 11 : 10,
-                            fontWeight: FontWeight.w600,
-                            color: selected.contains(t) ? AppColors.primaryText : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ]),
-                  ),
-                  if (selected.contains(t))
-                    const Positioned(top: 5, right: 5, child: IconCircle(icon: Icons.check, color: Colors.white, bg: AppColors.primary, size: 17, iconSize: 11)),
-                ]),
-              ),
+            ChoiceTile.job(
+              t,
+              label: english ? getJobMeta(t).labelEn : getJobMeta(t).label(lang),
+              selected: selected.contains(t),
+              onTap: () => onTap(t),
+              iconSize: iconSize,
             ),
         ],
       );
@@ -141,10 +126,10 @@ class YearDropdown extends StatelessWidget {
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.textTertiary),
             filled: true,
-            fillColor: AppColors.surface,
+            fillColor: AppColors.surfaceAlt,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: const BorderSide(color: Colors.transparent, width: 2)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: const BorderSide(color: AppColors.primaryContainer, width: 2)),
           ),
           items: [
             if (allowEmpty) DropdownMenuItem(value: '', child: Text('—', style: AppText.bodyLg.copyWith(color: AppColors.textTertiary))),
@@ -155,4 +140,48 @@ class YearDropdown extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Tonal band under the header: numbered step badge + segmented progress.
+class StepperBand extends StatelessWidget {
+  const StepperBand({super.key, required this.step, required this.total, this.title});
+
+  final int step;
+  final int total;
+  final String? title;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: AppColors.surfaceAlt,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+              child: Text('$step', style: AppText.label.copyWith(color: Colors.white)),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(title ?? '${'stepOf'.tr} $step / $total', style: AppText.captionStrong.copyWith(color: AppColors.primary))),
+          ]),
+          const SizedBox(height: AppSpacing.sm),
+          Row(children: [
+            for (var i = 1; i <= total; i++) ...[
+              if (i > 1) const SizedBox(width: 5),
+              Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i < step ? AppColors.primary : i == step ? AppColors.accent : AppColors.surfaceHighest,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ],
+          ]),
+        ]),
+      );
 }

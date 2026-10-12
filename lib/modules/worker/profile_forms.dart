@@ -3,32 +3,146 @@ import 'package:get/get.dart';
 
 import '../../app/data/stores/worker_store.dart';
 import '../../app/i18n/app_translations.dart';
-import '../../app/routes/app_routes.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text.dart';
+import '../../app/theme/job_meta.dart';
 import '../../app/utils/format.dart';
 import '../../app/utils/pincode.dart';
 import '../../app/widgets/common.dart';
-import 'onboarding_widgets.dart';
+import '../../app/widgets/dialogs.dart';
 
-/// Shared save/err/loading plumbing for the 4 detailed profile steps.
+/// Shared save/err/loading plumbing for the 4 profile edit forms. Each form is
+/// opened from the Profile tab, so a successful save returns there.
 mixin _SaveMixin on GetxController {
   final error = ''.obs;
   final loading = false.obs;
   WorkerStore get store => WorkerStore.to;
 
-  Future<void> save(Future<void> Function() call, String nextRoute) async {
+  Future<void> save(Future<void> Function() call) async {
     error.value = '';
     loading.value = true;
     try {
       await call();
       await store.afterProfileChange();
-      Get.offNamed(nextRoute);
+      Get.back();
+      Dialogs.toast(l('✓ Saved', '✓ सेव हो गया'));
     } catch (_) {
       error.value = 'saveFailed'.tr;
     } finally {
       loading.value = false;
     }
+  }
+}
+
+/// ScreenHeader with back, canvas body, pinned footer with one amber Save.
+class _FormScaffold extends StatelessWidget {
+  const _FormScaffold({required this.title, required this.ctrl, required this.onSave, required this.children});
+  final String title;
+  final _SaveMixin ctrl;
+  final VoidCallback onSave;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(children: [
+          ScreenHeader(title: title, onBack: Get.back),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 14, AppSpacing.lg, AppSpacing.xxl),
+              children: [
+                Obx(() => ctrl.error.value.isEmpty
+                    ? const SizedBox.shrink()
+                    : InfoNote(text: ctrl.error.value, tone: NoteTone.danger, icon: Icons.error_outline_rounded, margin: const EdgeInsets.only(bottom: 12))),
+                ...children,
+              ],
+            ),
+          ),
+          FooterBar(children: [
+            Obx(() => AppButton(title: 'save'.tr, icon: Icons.check_rounded, loading: ctrl.loading.value, onPressed: onSave)),
+          ]),
+        ]),
+      );
+}
+
+/// White card group with a bold title and optional grey line under it.
+class _Group extends StatelessWidget {
+  const _Group({this.title, this.sub, required this.children});
+  final String? title;
+  final String? sub;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (title != null) Text(title!, style: AppText.bodyStrong.copyWith(fontWeight: FontWeight.w800)),
+          if (sub != null) Padding(padding: const EdgeInsets.only(top: 2), child: Text(sub!, style: AppText.caption)),
+          if (title != null || sub != null) const SizedBox(height: 12),
+          ...children,
+        ]),
+      );
+}
+
+class _Chips extends StatelessWidget {
+  const _Chips({required this.options, required this.selected, required this.onTap});
+  final List<(String, String)> options;
+  final Iterable<String> selected;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) => Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final o in options) SelectChip(label: o.$2, selected: selected.contains(o.$1), onTap: () => onTap(o.$1)),
+      ]);
+}
+
+/// Year dropdown styled like AppInput (56px, white, 1.5px border).
+class _YearField extends StatelessWidget {
+  const _YearField({required this.label, required this.value, required this.onChanged, required this.emptyLabel});
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now().year;
+    final y = int.tryParse(value);
+    final current = y != null && y >= 1970 && y <= now ? value : '';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: AppText.captionStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 8),
+        Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.borderStrong, width: 1.5),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: current,
+              isExpanded: true,
+              icon: const Icon(Icons.expand_more_rounded, color: AppColors.textTertiary),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              items: [
+                DropdownMenuItem(
+                  value: '',
+                  child: Text(emptyLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyLg.copyWith(color: AppColors.textTertiary)),
+                ),
+                for (var y = now; y >= 1970; y--)
+                  DropdownMenuItem(value: '$y', child: Text('$y', style: AppText.bodyLg.copyWith(fontSize: 17, fontWeight: FontWeight.w600))),
+              ],
+              onChanged: (v) => onChanged(v ?? ''),
+            ),
+          ),
+        ),
+      ]),
+    );
   }
 }
 
@@ -40,7 +154,6 @@ class PersonalDetailsController extends GetxController with _SaveMixin {
   final father = TextEditingController();
   final gender = ''.obs;
   final education = ''.obs;
-  final nameText = ''.obs;
 
   @override
   void onInit() {
@@ -53,8 +166,6 @@ class PersonalDetailsController extends GetxController with _SaveMixin {
       gender.value = w.gender ?? '';
       education.value = w.educationLevel ?? '';
     }
-    nameText.value = name.text;
-    name.addListener(() => nameText.value = name.text);
   }
 
   Future<void> pickDob(BuildContext context) async {
@@ -76,7 +187,6 @@ class PersonalDetailsController extends GetxController with _SaveMixin {
         if (father.text.trim().isNotEmpty) 'father_name': father.text.trim(),
         if (education.value.isNotEmpty) 'education_level': education.value,
       }),
-      Routes.occupationSkills,
     );
   }
 
@@ -93,72 +203,54 @@ class PersonalDetailsView extends GetView<PersonalDetailsController> {
   const PersonalDetailsView({super.key});
 
   @override
-  Widget build(BuildContext context) => OnboardingScaffold(
-        title: 'personalDetails'.tr,
-        subtitle: '${'stepOf'.tr} 1 / 4',
-        step: 1,
-        total: 4,
-        error: controller.error,
+  Widget build(BuildContext context) => _FormScaffold(
+        title: l('Personal details', 'व्यक्तिगत जानकारी'),
+        ctrl: controller,
+        onSave: controller.submit,
         children: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Column(children: [
-                Stack(children: [
-                  Obx(() => AppAvatar(name: controller.nameText.value.isEmpty ? 'You' : controller.nameText.value, size: 84, fontSize: 30)),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 2)),
-                      child: const Icon(Icons.photo_camera, size: 15, color: Colors.white),
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: AppSpacing.sm),
-                Text('addPhoto'.tr, style: AppText.captionStrong.copyWith(color: AppColors.primary)),
-              ]),
+          _Group(children: [
+            AppInput(label: 'fullName'.tr, controller: controller.name, hint: 'asPerAadhaar'.tr, icon: Icons.person_outline, textCapitalization: TextCapitalization.words),
+            GestureDetector(
+              onTap: () => controller.pickDob(context),
+              child: AbsorbPointer(
+                child: AppInput(label: 'dateOfBirth'.tr, controller: controller.dob, hint: '1990-01-15', icon: Icons.calendar_today_outlined, helper: 'dobHint'.tr),
+              ),
             ),
-          ),
-          AppInput(label: 'fullName'.tr, controller: controller.name, hint: 'asPerAadhaar'.tr, icon: Icons.person_outline, textCapitalization: TextCapitalization.words),
-          GestureDetector(
-            onTap: () => controller.pickDob(context),
-            child: AbsorbPointer(
-              child: AppInput(label: 'dateOfBirth'.tr, controller: controller.dob, hint: '1990-01-15', icon: Icons.calendar_today_outlined, helper: 'dobHint'.tr),
+            AppInput(
+              label: '${'fatherHusbandName'.tr} (${'optional'.tr})',
+              controller: controller.father,
+              hint: 'optional'.tr,
+              icon: Icons.people_outline,
+              textCapitalization: TextCapitalization.words,
             ),
-          ),
-          AppInput(label: 'fatherHusbandName'.tr, controller: controller.father, hint: 'optional'.tr, icon: Icons.people_outline, textCapitalization: TextCapitalization.words),
-          Text('gender'.tr, style: AppText.captionStrong),
-          const SizedBox(height: AppSpacing.sm),
-          Obx(() => ChipGroup(
-                options: [ChipOption('M', 'male'.tr), ChipOption('F', 'female'.tr), ChipOption('O', 'other'.tr)],
-                selected: [controller.gender.value],
-                onToggle: (v) => controller.gender.value = v,
-              )),
-          const SizedBox(height: AppSpacing.lg),
-          Text('education'.tr, style: AppText.captionStrong),
-          const SizedBox(height: AppSpacing.sm),
-          Obx(() => ChipGroup(
-                options: [
-                  ChipOption('none', 'eduNone'.tr),
-                  ChipOption('class5', 'eduClass5'.tr),
-                  ChipOption('10th', 'edu10'.tr),
-                  ChipOption('12th', 'edu12'.tr),
-                  ChipOption('graduate', 'eduGrad'.tr),
-                  ChipOption('postgraduate', 'eduPostgrad'.tr),
-                ],
-                selected: [controller.education.value],
-                onToggle: (v) => controller.education.value = v,
-              )),
-          const SizedBox(height: AppSpacing.xxl),
-          Obx(() => AppButton(title: 'saveContinue'.tr, icon: Icons.arrow_forward, loading: controller.loading.value, onPressed: controller.submit)),
+          ]),
+          _Group(title: 'gender'.tr, children: [
+            Obx(() => SegmentedChoice<String>(
+                  options: [('M', 'male'.tr), ('F', 'female'.tr), ('O', 'other'.tr)],
+                  selected: controller.gender.value,
+                  onSelect: (v) => controller.gender.value = v,
+                  height: 48,
+                )),
+          ]),
+          _Group(title: 'education'.tr, children: [
+            Obx(() => _Chips(
+                  options: [
+                    ('none', 'eduNone'.tr),
+                    ('class5', 'eduClass5'.tr),
+                    ('10th', 'edu10'.tr),
+                    ('12th', 'edu12'.tr),
+                    ('graduate', 'eduGrad'.tr),
+                    ('postgraduate', 'eduPostgrad'.tr),
+                  ],
+                  selected: [controller.education.value],
+                  onTap: (v) => controller.education.value = v,
+                )),
+          ]),
         ],
       );
 }
 
-// ── 2. Occupation & skills ───────────────────────────────────────────────────
+// ── 2. Skills and experience ─────────────────────────────────────────────────
 
 class OccupationSkillsController extends GetxController with _SaveMixin {
   final selected = <String>[].obs;
@@ -204,7 +296,6 @@ class OccupationSkillsController extends GetxController with _SaveMixin {
             'expected_salary_max': prev[selected[i]]?.expectedSalaryMax,
           }
       ]),
-      Routes.workHistory,
     );
   }
 
@@ -221,56 +312,69 @@ class OccupationSkillsView extends GetView<OccupationSkillsController> {
   @override
   Widget build(BuildContext context) {
     final yr = l('yr', 'साल');
-    return OnboardingScaffold(
-      title: 'yourWorkSkills'.tr,
-      subtitle: '${'stepOf'.tr} 2 / 4',
-      step: 2,
-      total: 4,
-      error: controller.error,
+    return _FormScaffold(
+      title: l('Skills and experience', 'हुनर और अनुभव'),
+      ctrl: controller,
+      onSave: controller.submit,
       children: [
-        Text('whatWorkDoYouDo'.tr, style: AppText.bodyStrong),
-        const SizedBox(height: 2),
-        Text('selectOneOrMore'.tr, style: AppText.caption.copyWith(color: AppColors.textTertiary)),
-        const SizedBox(height: AppSpacing.md),
-        Obx(() => JobTypeGrid(selected: controller.selected.toSet(), onTap: controller.toggle)),
+        _Group(
+          title: 'whatWorkDoYouDo'.tr,
+          sub: l('Select one or more. The first one is your main work.', 'एक या ज़्यादा चुनें। पहला वाला आपका मुख्य काम है।'),
+          children: [
+            Obx(() => GridView.count(
+                  crossAxisCount: 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 0.95,
+                  children: [
+                    for (final t in jobTypes)
+                      ChoiceTile.job(t, label: jobLabel(t, lang), selected: controller.selected.contains(t), onTap: () => controller.toggle(t), iconSize: 40),
+                  ],
+                )),
+            Obx(() => controller.selected.isEmpty
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(children: [
+                      const Icon(Icons.star_rounded, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          l('Main work: ${jobLabel(controller.selected.first, lang)}', 'मुख्य काम: ${jobLabel(controller.selected.first, lang)}'),
+                          style: AppText.captionStrong.copyWith(color: AppColors.primaryDark),
+                        ),
+                      ),
+                    ]),
+                  )),
+          ],
+        ),
         Obx(() => !controller.selected.contains('driver')
             ? const SizedBox.shrink()
-            : SurfaceCard(
-                margin: const EdgeInsets.only(top: AppSpacing.sm),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('vehicleType'.tr, style: AppText.bodyStrong),
-                  const SizedBox(height: AppSpacing.sm),
-                  ChipGroup(
-                    options: [
-                      ChipOption('car', l('Car', 'कार')),
-                      ChipOption('heavy_vehicle', l('Heavy vehicle', 'भारी वाहन')),
-                      ChipOption('truck', l('Truck', 'ट्रक')),
-                      ChipOption('auto', l('Auto', 'ऑटो')),
-                      ChipOption('bus', l('Bus', 'बस')),
-                    ],
-                    selected: [controller.driverSpec.value],
-                    onToggle: (v) => controller.driverSpec.value = v,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AppInput(label: 'drivingLicence'.tr, controller: controller.licence, hint: 'MH01234567890123', icon: Icons.credit_card, inputFormatters: [UpperCaseFormatter()]),
-                ]),
+            : _Group(title: 'vehicleType'.tr, children: [
+                _Chips(
+                  options: [
+                    ('car', l('Car', 'कार')),
+                    ('heavy_vehicle', l('Heavy vehicle', 'भारी वाहन')),
+                    ('truck', l('Truck', 'ट्रक')),
+                    ('auto', l('Auto', 'ऑटो')),
+                    ('bus', l('Bus', 'बस')),
+                  ],
+                  selected: [controller.driverSpec.value],
+                  onTap: (v) => controller.driverSpec.value = v,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppInput(label: 'drivingLicence'.tr, controller: controller.licence, hint: 'MH01234567890123', icon: Icons.credit_card, inputFormatters: [UpperCaseFormatter()]),
+              ])),
+        _Group(title: 'howManyYearsExp'.tr, children: [
+          Obx(() => SegmentedChoice<String>(
+                options: [('0', '0-1 $yr'), ('2', '1-3 $yr'), ('4', '3-5 $yr'), ('7', '5-10 $yr'), ('10', '10+ $yr')],
+                selected: controller.experience.value,
+                onSelect: (v) => controller.experience.value = v,
+                height: 48,
               )),
-        const SizedBox(height: AppSpacing.lg),
-        Text('howManyYearsExp'.tr, style: AppText.bodyStrong),
-        const SizedBox(height: AppSpacing.sm),
-        Obx(() => ChipGroup(
-              options: [
-                ChipOption('0', '0-1 $yr'),
-                ChipOption('2', '1-3 $yr'),
-                ChipOption('4', '3-5 $yr'),
-                ChipOption('7', '5-10 $yr'),
-                ChipOption('10', '10+ $yr'),
-              ],
-              selected: [controller.experience.value],
-              onToggle: (v) => controller.experience.value = v,
-            )),
-        const SizedBox(height: AppSpacing.xxl),
-        Obx(() => AppButton(title: 'saveContinue'.tr, icon: Icons.arrow_forward, loading: controller.loading.value, onPressed: controller.submit)),
+        ]),
       ],
     );
   }
@@ -352,7 +456,6 @@ class WorkHistoryController extends GetxController with _SaveMixin {
             if (e.reason.value.isNotEmpty) 'leave_reason': e.reason.value,
           }
       ]),
-      Routes.locationPrefs,
     );
   }
 
@@ -369,24 +472,23 @@ class WorkHistoryView extends GetView<WorkHistoryController> {
   const WorkHistoryView({super.key});
 
   @override
-  Widget build(BuildContext context) => OnboardingScaffold(
-        title: 'workHistory'.tr,
-        subtitle: '${'stepOf'.tr} 3 / 4',
-        step: 3,
-        total: 4,
-        sub: 'prevEmployerInfo'.tr,
-        error: controller.error,
+  Widget build(BuildContext context) => _FormScaffold(
+        title: l('Work history', 'काम का अनुभव'),
+        ctrl: controller,
+        onSave: controller.submit,
         children: [
-          Obx(() => Column(children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              l('Employers trust workers with a past job they can check.', 'जिन कामगारों का पिछला काम जाँचा जा सके, उन पर नियोक्ता ज़्यादा भरोसा करते हैं।'),
+              style: AppText.body,
+            ),
+          ),
+          Obx(() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 for (var i = 0; i < controller.entries.length; i++) _HistoryCard(index: i, entry: controller.entries[i]),
                 if (controller.entries.length < 3)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                    child: AppButton(title: 'addEmployer'.tr, icon: Icons.add, variant: ButtonVariant.secondary, size: ButtonSize.md, onPressed: controller.add),
-                  ),
+                  AppButton(title: 'addEmployer'.tr, icon: Icons.add, variant: ButtonVariant.secondary, size: ButtonSize.md, onPressed: controller.add),
               ])),
-          Obx(() => AppButton(title: 'saveContinue'.tr, icon: Icons.arrow_forward, loading: controller.loading.value, onPressed: controller.submit)),
-          LinkButton(text: 'noExperienceSkip'.tr, onTap: () => Get.offNamed(Routes.locationPrefs)),
         ],
       );
 }
@@ -397,53 +499,63 @@ class _HistoryCard extends StatelessWidget {
   final HistoryEntry entry;
 
   @override
-  Widget build(BuildContext context) => SurfaceCard(
-        margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-              child: Text('${index + 1}', style: AppText.captionStrong.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text('${'employerN'.tr} ${index + 1}${index == 0 ? '' : ' (${'optional'.tr})'}', style: AppText.h3)),
-          ]),
-          const SizedBox(height: AppSpacing.md),
-          AppInput(label: 'companyEmployerName'.tr, controller: entry.employer, hint: 'ABC Pvt Ltd', icon: Icons.business_outlined),
-          AppInput(label: 'yourRole'.tr, controller: entry.role, hint: 'worker'.tr, icon: Icons.work_outline),
-          Obx(() => YearDropdown(label: 'fromYear'.tr, value: entry.fromYear.value, onChanged: (v) => entry.fromYear.value = v)),
-          Obx(() => YearDropdown(label: 'toYear'.tr, value: entry.toYear.value, onChanged: (v) => entry.toYear.value = v)),
-          AppInput(label: '${'refName'.tr} (${'optional'.tr})', controller: entry.refName, hint: 'refName'.tr, icon: Icons.person_outline),
-          AppInput(
-            label: '${'refMobile'.tr} (${'optional'.tr})',
-            controller: entry.refMobile,
-            hint: '9876543210',
-            keyboardType: TextInputType.phone,
-            maxLength: 10,
-            inputFormatters: [digitsOnly],
-            icon: Icons.call_outlined,
+  Widget build(BuildContext context) => _Group(children: [
+        Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+            child: Text('${index + 1}', style: AppText.captionStrong.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
           ),
-          Text('reasonLeaving'.tr, style: AppText.captionStrong),
-          const SizedBox(height: AppSpacing.sm),
-          Obx(() => ChipGroup(
-                options: [
-                  ChipOption('better_pay', 'betterPay'.tr),
-                  ChipOption('family', 'familyReason'.tr),
-                  ChipOption('relocation', 'relocation'.tr),
-                  ChipOption('contract_end', 'contractEnded'.tr),
-                  ChipOption('other', 'other'.tr),
-                ],
-                selected: [entry.reason.value],
-                onToggle: (v) => entry.reason.value = v,
-              )),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('${'employerN'.tr} ${index + 1}${index == 0 ? '' : ' (${'optional'.tr})'}',
+                style: AppText.bodyStrong.copyWith(fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
         ]),
-      );
+        const SizedBox(height: AppSpacing.lg),
+        AppInput(label: 'companyEmployerName'.tr, controller: entry.employer, hint: 'ABC Pvt Ltd', icon: Icons.business_outlined),
+        AppInput(label: 'yourRole'.tr, controller: entry.role, hint: 'worker'.tr, icon: Icons.work_outline),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Obx(() => _YearField(label: 'fromYear'.tr, value: entry.fromYear.value, emptyLabel: '—', onChanged: (v) => entry.fromYear.value = v))),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Obx(() => _YearField(
+                  label: l('To year', 'किस साल तक'),
+                  value: entry.toYear.value,
+                  emptyLabel: l('Still working', 'अभी भी यहीं'),
+                  onChanged: (v) => entry.toYear.value = v,
+                )),
+          ),
+        ]),
+        AppInput(label: '${'refName'.tr} (${'optional'.tr})', controller: entry.refName, hint: 'refName'.tr, icon: Icons.person_outline),
+        AppInput(
+          label: '${'refMobile'.tr} (${'optional'.tr})',
+          controller: entry.refMobile,
+          hint: '9876543210',
+          keyboardType: TextInputType.phone,
+          maxLength: 10,
+          inputFormatters: [digitsOnly],
+          icon: Icons.call_outlined,
+        ),
+        Text('reasonLeaving'.tr, style: AppText.captionStrong),
+        const SizedBox(height: AppSpacing.sm),
+        Obx(() => _Chips(
+              options: [
+                ('better_pay', 'betterPay'.tr),
+                ('family', 'familyReason'.tr),
+                ('relocation', 'relocation'.tr),
+                ('contract_end', 'contractEnded'.tr),
+                ('other', 'other'.tr),
+              ],
+              selected: [entry.reason.value],
+              onTap: (v) => entry.reason.value = v,
+            )),
+      ]);
 }
 
-// ── 4. Location & preferences ────────────────────────────────────────────────
+// ── 4. Location and preferences ──────────────────────────────────────────────
 
 const _topCities = [
   'Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow',
@@ -497,7 +609,6 @@ class LocationPrefsController extends GetxController with _SaveMixin {
           'is_live_in_ok': liveIn.value,
           'is_pan_india': panIndia.value,
         }),
-        Routes.kyc,
       );
 
   @override
@@ -513,36 +624,57 @@ class LocationPrefsView extends GetView<LocationPrefsController> {
   const LocationPrefsView({super.key});
 
   @override
-  Widget build(BuildContext context) => OnboardingScaffold(
-        title: 'locationPrefsTitle'.tr,
-        subtitle: '${'stepOf'.tr} 4 / 4',
-        step: 4,
-        total: 4,
-        error: controller.error,
+  Widget build(BuildContext context) => _FormScaffold(
+        title: l('Location and preferences', 'जगह और पसंद'),
+        ctrl: controller,
+        onSave: controller.submit,
         children: [
-          AppInput(label: 'livingAddress'.tr, controller: controller.address, hint: 'currentAddress'.tr, icon: Icons.home_outlined, maxLines: 3),
-          AppInput(
-            label: 'pincode'.tr,
-            controller: controller.pincode,
-            hint: '110001',
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            inputFormatters: [digitsOnly],
-            icon: Icons.markunread_mailbox_outlined,
-            onChanged: controller.onPincode,
+          _Group(title: l('Where do you live?', 'आप कहाँ रहते हैं?'), children: [
+            AppInput(
+              label: 'pincode'.tr,
+              controller: controller.pincode,
+              hint: '110001',
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [digitsOnly],
+              icon: Icons.markunread_mailbox_outlined,
+              onChanged: controller.onPincode,
+            ),
+            Obx(() => controller.lookingUp.value
+                ? const Padding(padding: EdgeInsets.only(bottom: 12), child: LinearProgressIndicator(color: AppColors.primary))
+                : const SizedBox.shrink()),
+            Obx(() => AppInput(
+                  label: 'city'.tr,
+                  controller: controller.city,
+                  hint: 'Delhi',
+                  icon: Icons.location_city_outlined,
+                  helper: controller.state.value.isEmpty ? null : controller.state.value,
+                )),
+            AppInput(label: 'livingAddress'.tr, controller: controller.address, hint: 'currentAddress'.tr, icon: Icons.home_outlined, maxLines: 3),
+          ]),
+          _Group(
+            title: l('Preferred cities', 'पसंदीदा शहर'),
+            sub: l('Choose all the cities where you can work', 'जहाँ-जहाँ आप काम कर सकते हैं, वे सभी शहर चुनें'),
+            children: [
+              Obx(() => _Chips(options: [for (final c in _topCities) (c, c)], selected: controller.preferred.toList(), onTap: controller.toggleCity)),
+            ],
           ),
-          Obx(() => controller.lookingUp.value
-              ? const Padding(padding: EdgeInsets.only(bottom: 12), child: LinearProgressIndicator(color: AppColors.primary))
-              : const SizedBox.shrink()),
-          AppInput(label: 'city'.tr, controller: controller.city, hint: 'Delhi', icon: Icons.business_outlined),
-          Text('preferredCities'.tr, style: AppText.captionStrong),
-          const SizedBox(height: AppSpacing.sm),
-          Obx(() => ChipGroup(options: [for (final c in _topCities) ChipOption(c, c)], selected: controller.preferred.toList(), onToggle: controller.toggleCity)),
-          const SizedBox(height: AppSpacing.lg),
-          Obx(() => ToggleCard(icon: Icons.bed_outlined, label: 'willingLiveIn'.tr, value: controller.liveIn.value, onChanged: (v) => controller.liveIn.value = v)),
-          Obx(() => ToggleCard(icon: Icons.public, label: 'openPanIndia'.tr, value: controller.panIndia.value, onChanged: (v) => controller.panIndia.value = v)),
-          const SizedBox(height: AppSpacing.lg),
-          Obx(() => AppButton(title: 'saveContinue'.tr, icon: Icons.arrow_forward, loading: controller.loading.value, onPressed: controller.submit)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 4, 2, 10),
+            child: Text(l('Work preferences', 'काम की पसंद'), style: AppText.bodyStrong.copyWith(fontWeight: FontWeight.w800)),
+          ),
+          Obx(() => ToggleCard(
+                icon: Icons.bed_outlined,
+                label: 'willingLiveIn'.tr,
+                value: controller.liveIn.value,
+                onChanged: (v) => controller.liveIn.value = v,
+              )),
+          Obx(() => ToggleCard(
+                icon: Icons.public,
+                label: 'openPanIndia'.tr,
+                value: controller.panIndia.value,
+                onChanged: (v) => controller.panIndia.value = v,
+              )),
         ],
       );
 }

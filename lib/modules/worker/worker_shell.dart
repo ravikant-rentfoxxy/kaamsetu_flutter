@@ -8,11 +8,13 @@ import '../../app/routes/app_routes.dart';
 import '../../app/widgets/common.dart';
 import '../shared/tab_shell.dart';
 import 'jobs_view.dart';
-import 'kyc_view.dart';
 import 'profile_view.dart';
 import 'worker_home_view.dart';
 
 class WorkerShellController extends GetxController {
+  /// Route argument: open KYC on top of the shell once it is on screen.
+  static const openKyc = 'openKyc';
+
   final tab = 0.obs;
   final store = WorkerStore.to;
   bool _redirected = false;
@@ -22,6 +24,9 @@ class WorkerShellController extends GetxController {
     super.onReady();
     ever<WorkerProfile?>(store.profile, _guard);
     _guard(store.profile.value);
+    // Pushed from here (not by the caller in the same frame) so GetX ties this
+    // controller to /worker and doesn't dispose it when KYC is popped.
+    if (!_redirected && Get.arguments == openKyc) Get.toNamed(Routes.kyc);
   }
 
   // Blocked workers see the reinstatement screen; brand-new workers go through
@@ -38,6 +43,7 @@ class WorkerShellController extends GetxController {
   }
 }
 
+/// Three tabs: Home · Jobs · Profile.
 class WorkerShellView extends GetView<WorkerShellController> {
   const WorkerShellView({super.key});
 
@@ -59,16 +65,13 @@ class WorkerShellView extends GetView<WorkerShellController> {
                 : const LoadingView(),
           );
         }
-        final verified = store.isVerified;
         return TabShell(
           index: controller.tab.value,
           onTap: (i) => controller.tab.value = i,
           tabs: [
-            ShellTab(Icons.home_outlined, Icons.home, 'tabHome'.tr, const WorkerHomeView()),
-            verified
-                ? ShellTab(Icons.work_outline, Icons.work, l('Jobs', 'नौकरियाँ'), const JobsView())
-                : ShellTab(Icons.verified_user_outlined, Icons.verified_user, 'tabVerify'.tr, const KycView(embedded: true)),
-            ShellTab(Icons.person_outline, Icons.person, 'tabProfile'.tr, const ProfileView()),
+            ShellTab(Icons.home_outlined, Icons.home_rounded, l('Home', 'होम'), const WorkerHomeView()),
+            ShellTab(Icons.work_outline_rounded, Icons.work_rounded, l('Jobs', 'नौकरियाँ'), const JobsView()),
+            ShellTab(Icons.person_outline_rounded, Icons.person_rounded, l('Profile', 'प्रोफ़ाइल'), const ProfileView()),
           ],
         );
       });

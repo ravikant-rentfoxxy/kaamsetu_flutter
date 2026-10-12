@@ -19,6 +19,9 @@ abstract class Routes {
   static const kyc = '/worker/kyc';
   static const blocked = '/worker/blocked';
   static const offerLetter = '/offer-letter';
+  static const jobDetail = '/worker/job';
+  static const activity = '/worker/activity';
+  static const refer = '/worker/refer';
 
   // Employer
   static const employer = '/employer';

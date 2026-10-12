@@ -43,9 +43,9 @@ void main() {
 
     // Default (Hindi) — switching locale triggers an engine reassemble,
     // which the widget-test scheduler can't run.
-    await t.tap(find.text('आगे बढ़ें'));
+    await t.tap(find.text('आगे बढ़ें · Continue'));
     await settle(t);
-    expect(find.text('मोबाइल नंबर डालें'), findsOneWidget);
+    expect(find.text('स्वागत है। आप यहाँ किसलिए आए हैं?'), findsOneWidget);
     expect(find.textContaining('डेमो मोड'), findsOneWidget);
 
     await t.ensureVisible(find.textContaining('9123456789'));
@@ -56,12 +56,12 @@ void main() {
     await t.pump();
     await t.tap(find.text('OTP भेजें'));
     await settle(t);
-    expect(find.text('OTP डालें'), findsOneWidget);
+    expect(find.text('6 अंकों का कोड डालें'), findsOneWidget);
 
     await t.tap(find.text('भरें'));
     await t.tap(find.text('OTP जाँचें'));
     await settle(t, 12);
-    expect(find.text('Sharma Logistics Pvt Ltd'), findsOneWidget);
+    expect(find.textContaining('Sharma Logistics Pvt Ltd'), findsWidgets);
     expect(AuthService.to.isEmployer, isTrue);
   });
 
@@ -73,56 +73,55 @@ void main() {
     AuthService.to.language.value = 'en';
     await boot(t, Routes.worker);
 
-    expect(find.text('Ramesh Kumar'), findsOneWidget);
-    expect(find.text('Jobs for you'), findsOneWidget);
-    expect(find.text('Driver'), findsWidgets);
+    expect(find.text('Ramesh Kumar'), findsWidgets);
+    expect(find.text('New jobs for you'), findsOneWidget);
+    expect(find.textContaining('Driver'), findsWidgets);
 
-    // Home tabs
-    await t.tap(find.textContaining('Applied ('));
+    // Activity: applications / offers
+    Get.toNamed(Routes.activity);
+    await settle(t);
+    await t.tap(find.textContaining('Applications ·'));
     await settle(t, 2);
-    expect(find.text('Shortlisted'), findsOneWidget);
-    await t.tap(find.textContaining('Offers'));
+    expect(find.text('Shortlisted'), findsWidgets);
+    await t.tap(find.textContaining('Offers ·'));
     await settle(t, 2);
-    expect(find.text('Green Valley Residency'), findsOneWidget);
+    expect(find.textContaining('Green Valley Residency'), findsWidgets);
+    Get.back();
+    await settle(t, 2);
 
-    // Job detail sheet
-    await t.tap(find.textContaining('Jobs').first);
+    // Jobs tab → job detail page
+    await t.tap(find.byIcon(Icons.work_outline_rounded));
     await settle(t, 2);
     final deliveryCard = find.widgetWithText(JobCard, 'Delivery');
     await t.ensureVisible(deliveryCard);
     await t.pump();
     await t.tap(deliveryCard);
     await settle(t, 2);
-    expect(find.text('Apply'), findsOneWidget);
+    expect(find.text('Apply now'), findsOneWidget);
     Get.back();
     await settle(t, 2);
 
-    // Bottom tabs: Jobs browse + Profile
-    await t.tap(find.text('Jobs').last);
+    // Profile tab
+    await t.tap(find.byIcon(Icons.person_outline_rounded));
     await settle(t);
-    expect(find.text('Browse Jobs'), findsOneWidget);
-    await t.tap(find.text('Profile'));
-    await settle(t);
-    expect(find.text('Refer & Earn'), findsOneWidget);
-    expect(find.text('RAMEK7Q2'), findsOneWidget);
+    expect(find.text('Refer and earn'), findsOneWidget);
 
-    await visit(t, Routes.personalDetails, expect_: find.text('Personal Details'));
-    await visit(t, Routes.occupationSkills, expect_: find.text('Your work & skills'));
+    await visit(t, Routes.refer, expect_: find.text('RAMEK7Q2'));
+    await visit(t, Routes.personalDetails, expect_: find.text('Personal details'));
+    await visit(t, Routes.occupationSkills, expect_: find.text('Skills and experience'));
     await visit(t, Routes.workHistory, expect_: find.text('City Cabs Pvt Ltd'));
-    await visit(t, Routes.locationPrefs, expect_: find.text('Location & preferences'));
-    await visit(t, Routes.kyc, expect_: find.text('Congratulations!'));
+    await visit(t, Routes.locationPrefs, expect_: find.text('Location and preferences'));
+    await visit(t, Routes.kyc, expect_: find.text("You're verified!"));
 
     // Offer letter (rendered in-app in demo mode).
-    await t.tap(find.text('Home'));
-    await settle(t, 2);
-    await t.fling(find.byType(Scrollable).first, const Offset(0, 3000), 3000);
-    await settle(t, 3);
-    await t.tap(find.textContaining('Offers'));
+    Get.toNamed(Routes.activity);
+    await settle(t);
+    await t.tap(find.textContaining('Offers ·'));
     await settle(t, 2);
     final view = find.text('View offer letter');
-    await t.scrollUntilVisible(view, 150, scrollable: find.byType(Scrollable).first);
+    await t.scrollUntilVisible(view, 150, scrollable: find.byType(Scrollable).last);
     await t.pump();
-    await t.tap(view);
+    await t.tap(view.first);
     await settle(t);
     expect(find.textContaining('Dear Ramesh Kumar'), findsOneWidget);
   });
@@ -140,7 +139,7 @@ void main() {
     await t.enterText(find.byType(TextField), 'Kamal Singh');
     await t.tap(find.text('Next'));
     await settle(t);
-    expect(find.text('What work are you looking for?'), findsOneWidget);
+    expect(find.text('What work do you do?'), findsOneWidget);
     await t.tap(find.text('Driver'));
     await t.pump();
     await t.tap(find.text('Next'));
@@ -155,28 +154,44 @@ void main() {
     await t.pump();
     await t.tap(find.text('Next'));
     await settle(t);
-    await t.tap(find.text('₹16k – 20k'));
+    await t.tap(find.text('₹16,000 – 20,000'));
     await t.pump();
     await t.tap(find.text('Finish'));
     await settle(t);
     expect(find.textContaining('Profile created'), findsOneWidget);
 
-    await t.tap(find.text('Proceed'));
+    // Straight into KYC, then back: the shell under it must survive the pop.
+    await t.tap(find.text('Start verification'));
     await settle(t, 12);
-    expect(find.text('Kamal Singh'), findsOneWidget);
-    expect(find.text('Jobs are locked'), findsOneWidget);
+    expect(find.text('Identity verification'), findsOneWidget);
+    Get.back();
+    await settle(t, 4);
+    expect(find.text('Kamal Singh'), findsWidgets);
+    expect(find.text('Verify to apply for jobs'), findsOneWidget);
 
-    // Verify tab: walk all 5 mock KYC steps.
-    await t.tap(find.text('Verify'));
+    // Verification card → walk all 5 mock KYC steps, one focused screen each.
+    await t.tap(find.text('Start verification'));
     await settle(t);
-    for (final btn in ['Take photo', 'Save address', 'Link Aadhaar', 'Verify PAN', 'Start check']) {
-      final f = find.widgetWithText(InkWell, btn);
-      await t.ensureVisible(f.first);
-      await t.tap(f.first);
+    final steps = <(String, Finder)>[
+      ('Continue: take a selfie', find.byTooltip('Take photo')),
+      ('Continue: confirm address', find.widgetWithText(InkWell, 'Save address')),
+      ('Continue: link Aadhaar', find.widgetWithText(InkWell, 'Link Aadhaar')),
+      ('Continue: verify PAN', find.widgetWithText(InkWell, 'Verify PAN')),
+      ('Continue: background check', find.widgetWithText(InkWell, 'Start check')),
+    ];
+    for (final (open, action) in steps) {
+      await t.tap(find.textContaining(open));
+      await settle(t);
+      await t.ensureVisible(action.first);
+      await t.pump(); // lay out the scrolled position before tapping
+      await t.tap(action.first);
       await settle(t, 10);
     }
-    // Fully verified → the shell swaps the Verify tab for Jobs.
-    expect(find.text('Browse Jobs'), findsOneWidget);
+    // Fully verified → back on Home, the matched jobs are unlocked.
+    expect(find.text("You're verified!"), findsOneWidget);
+    Get.back();
+    await settle(t);
+    expect(find.text('New jobs for you'), findsOneWidget);
     expect(WorkerStore.to.isVerified, isTrue);
     expect(WorkerStore.to.jobs, isNotEmpty);
   });
@@ -189,7 +204,7 @@ void main() {
     AuthService.to.language.value = 'en';
     await boot(t, Routes.worker);
     await settle(t);
-    expect(find.text('Your profile has been paused'), findsOneWidget);
+    expect(find.text('Your profile is paused'), findsOneWidget);
     expect(find.text('South Delhi'), findsOneWidget);
   });
 
@@ -201,29 +216,34 @@ void main() {
     AuthService.to.language.value = 'en';
     await boot(t, Routes.employer);
 
-    expect(find.text('Business Verified'), findsOneWidget);
+    expect(find.textContaining('Verified business'), findsWidgets);
+    await t.tap(find.text('Applications'));
+    await settle(t, 2);
     for (final tab in ['Applied 3', 'Shortlist 1', 'Hired 2']) {
-      await t.ensureVisible(find.text(tab));
-      await t.pump();
       await t.tap(find.text(tab));
       await settle(t, 2);
     }
     expect(find.text('E-Sign'), findsOneWidget);
+    Get.back();
+    await settle(t, 2);
 
     await t.tap(find.text('Post').last);
     await settle(t);
-    expect(find.text('Job type'), findsOneWidget);
-    await t.tap(find.text('Find'));
+    expect(find.text('What work do you need done?'), findsOneWidget);
+    await t.tap(find.text('Workers'));
     await settle(t);
-    expect(find.text('Find Workers'), findsOneWidget);
     expect(find.byType(WorkerCard), findsWidgets);
+    await t.tap(find.text('Business'));
+    await settle(t);
+    await t.scrollUntilVisible(find.text('Log out'), 200, scrollable: find.byType(Scrollable).last);
+    expect(find.text('Log out'), findsOneWidget);
 
-    await visit(t, Routes.matchedProfiles, arguments: 'r1', expect_: find.text('Matched Workers'));
+    await visit(t, Routes.matchedProfiles, arguments: 'r1', expect_: find.text('Matched workers'));
     final ramesh = EmployerStore.to.shortlisted.single.worker!;
-    await visit(t, Routes.workerDetail, arguments: {'worker': ramesh, 'requirementId': 'r1'}, expect_: find.text('Verification Status'));
+    await visit(t, Routes.workerDetail, arguments: {'worker': ramesh, 'requirementId': 'r1'}, expect_: find.text('Verification'));
     await visit(t, Routes.caseAlerts, expect_: find.textContaining('IPC 379', findRichText: true));
     await visit(t, Routes.employerVerification, expect_: find.text('Verification complete!'));
-    await visit(t, Routes.hire, arguments: HireArgs(workerId: 'w4', workerName: 'Mohammed Irfan', requirementId: 'r1'), expect_: find.text('Confirm Hire'));
+    await visit(t, Routes.hire, arguments: HireArgs(workerId: 'w4', workerName: 'Mohammed Irfan', requirementId: 'r1'), expect_: find.text('Make an offer'));
   });
 
   testWidgets(timeout: const Timeout(Duration(seconds: 90)), 'new employer is sent to registration', (t) async {
@@ -231,8 +251,9 @@ void main() {
       await setUpDemo();
       await loginAs('9555555555', role: 'EMPLOYER');
     });
+    AuthService.to.language.value = 'en';
     await boot(t, Routes.employer);
     await settle(t);
-    expect(find.text('Register as Employer'), findsOneWidget);
+    expect(find.text('Register your business'), findsOneWidget);
   });
 }
